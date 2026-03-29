@@ -1,0 +1,67 @@
+### Health check
+GET http://localhost:8020/health
+
+###
+
+### Reporte: árbol caído (Flora)
+POST http://localhost:8020/webhook/whatsapp
+Content-Type: application/x-www-form-urlencoded
+
+From=whatsapp:+573001111111&Body=Un arbol enorme cayó sobre la carrera 5 con calle 10 en el barrio Granada, esta bloqueando el carril derecho&NumMedia=0
+
+###
+
+### Reporte: rescate animal (Fauna)
+POST http://localhost:8020/webhook/whatsapp
+Content-Type: application/x-www-form-urlencoded
+
+From=whatsapp:+573002222222&Body=Encontré un búho herido en el parque lineal del río Cali, no puede volar y está en el piso&NumMedia=0
+
+###
+
+### Reporte: tala ilegal (Flora IVC)
+POST http://localhost:8020/webhook/whatsapp
+Content-Type: application/x-www-form-urlencoded
+
+From=whatsapp:+573003333333&Body=Están talando árboles nativos sin permiso en la zona verde de Ciudad Jardín, ya van más de 20 árboles&NumMedia=0
+
+###
+
+### Reporte: contaminación hídrica
+POST http://localhost:8020/webhook/whatsapp
+Content-Type: application/x-www-form-urlencoded
+
+From=whatsapp:+573004444444&Body=El humedal de Charco Azul está recibiendo vertimientos de una empresa cercana, el agua está negra y con espuma&NumMedia=0
+
+###
+
+### Reporte con coordenadas GPS
+POST http://localhost:8020/webhook/whatsapp
+Content-Type: application/x-www-form-urlencoded
+
+From=whatsapp:+573005555555&Body=Árbol caído bloqueando la vía&NumMedia=0&Latitude=3.4516&Longitude=-76.5320
+
+###
+
+### Ver todos los reportes
+GET http://localhost:8020/reportes/
+
+###
+
+### Ver solo Flora (árbol caído)
+GET http://localhost:8020/reportes/flora/arbol-caido
+
+###
+
+### Ver solo Fauna (rescate)
+GET http://localhost:8020/reportes/fauna/rescate-animales
+
+###
+
+### Ver solo Flora IVC (tala)
+GET http://localhost:8020/reportes/flora-ivc/tala-arboles
+
+###
+
+### Ver solo Hídrica (contaminación)
+GET http://localhost:8020/reportes/hidrica/contaminacion

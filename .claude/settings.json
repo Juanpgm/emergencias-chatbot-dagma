@@ -1,0 +1,46 @@
+{
+  "autoMemoryEnabled": true,
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Write(app/**)",
+      "Write(tests/**)",
+      "Write(alembic/**)",
+      "Write(CLAUDE.md)",
+      "Write(AGENTS.md)",
+      "Write(TOOLS.md)",
+      "Write(SKILLS.md)",
+      "Write(README.md)",
+      "Write(requirements.txt)",
+      "Write(pyproject.toml)",
+      "Write(.claude/**)",
+      "Write(.gitignore)",
+      "Bash(pip*)",
+      "Bash(uvicorn*)",
+      "Bash(alembic*)",
+      "Bash(pytest*)",
+      "Bash(python*)",
+      "Bash(ruff*)",
+      "Bash(curl*)",
+      "Bash(mkdir*)",
+      "Bash(cat*)",
+      "Bash(echo*)",
+      "Bash(cd*)",
+      "Bash(ls*)",
+      "Bash(dir*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git stash*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(git push --force*)",
+      "Write(.env)"
+    ]
+  }
+}

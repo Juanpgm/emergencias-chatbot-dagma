@@ -43,11 +43,6 @@ async def run_async_migrations() -> None:
         poolclass=pool.NullPool,
     )
     async with connectable.connect() as connection:
-        # Habilitar PostGIS antes de correr migraciones (necesario en Railway/cloud)
-        await connection.execute(
-            __import__("sqlalchemy").text("CREATE EXTENSION IF NOT EXISTS postgis CASCADE")
-        )
-        await connection.commit()
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from geoalchemy2 import Geometry
 from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -47,9 +46,6 @@ class ReporteEmergencia(Base):
     ubicacion_inferida: Mapped[str | None] = mapped_column(String(500), nullable=True)
     latitud: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitud: Mapped[float | None] = mapped_column(Float, nullable=True)
-    geom: Mapped[None] = mapped_column(
-        Geometry(geometry_type="POINT", srid=4326), nullable=True
-    )
 
     # Gravedad
     nivel_de_gravedad: Mapped[str] = mapped_column(

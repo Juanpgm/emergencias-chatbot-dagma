@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 
-from geoalchemy2.shape import from_shape
-from shapely.geometry import Point
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.emergencia import (
@@ -35,10 +33,6 @@ async def guardar_reporte(
     """
     area = TIPO_A_AREA[datos.tipo_de_emergencia].value
 
-    geom = None
-    if datos.latitud is not None and datos.longitud is not None:
-        geom = from_shape(Point(datos.longitud, datos.latitud), srid=4326)
-
     # ── 1. Tabla maestra ───────────────────────────────────────────────────────
     reporte = ReporteEmergencia(
         nombre_reportante=datos.nombre_reportante,
@@ -54,7 +48,6 @@ async def guardar_reporte(
         ubicacion_inferida=datos.ubicacion_inferida,
         latitud=datos.latitud,
         longitud=datos.longitud,
-        geom=geom,
         nivel_de_gravedad=datos.nivel_de_gravedad,
         requiere_atencion_inmediata=datos.requiere_atencion_inmediata,
         texto_original=texto_original,

@@ -9,7 +9,6 @@ pydantic-settings==2.7.1
 # Database
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.29.0
-geoalchemy2==0.15.2
 alembic==1.14.1
 
 # AI / LLM
@@ -21,9 +20,6 @@ groq>=0.37.0
 
 # Audio processing
 pydub==0.25.1
-
-# Geoespacial
-shapely>=2.0
 
 # Utilities
 python-multipart==0.0.20
