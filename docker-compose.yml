@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: dagma_postgres
+    environment:
+      POSTGRES_USER: dagma_user
+      POSTGRES_PASSWORD: dagma_pass
+      POSTGRES_DB: emergencias_dagma
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dagma_user -d emergencias_dagma"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

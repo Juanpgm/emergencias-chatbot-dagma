@@ -1,0 +1,18 @@
+[project]
+name = "emergencias-dagma-chatbot"
+version = "0.1.0"
+description = "Backend para atención de emergencias ambientales vía WhatsApp - DAGMA Cali"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
