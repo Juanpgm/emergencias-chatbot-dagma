@@ -93,6 +93,19 @@ class DatosEmergencia(BaseModel):
     )
 
 
+# ── Datos de contacto (extracción ligera, sin campos de emergencia) ────────────
+
+class DatosContacto(BaseModel):
+    """Nombre y teléfono extraídos de un mensaje de contacto del ciudadano."""
+
+    nombre_reportante: Optional[str] = Field(
+        None, description="Nombre completo de la persona que reporta."
+    )
+    telefono: Optional[str] = Field(
+        None, description="Número de teléfono colombiano de contacto (10 dígitos, empieza por 3)."
+    )
+
+
 # ── Payload entrante de WhatsApp ───────────────────────────────────────────────
 
 class WhatsAppMessage(BaseModel):

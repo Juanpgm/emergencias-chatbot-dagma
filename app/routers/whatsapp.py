@@ -15,7 +15,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.schemas.emergencia import DatosEmergencia
-from app.services.extraccion import extraer_datos_emergencia
+from app.services.extraccion import extraer_contacto, extraer_datos_emergencia
 from app.services.persistencia import guardar_reporte
 from app.services.transcripcion import transcribir_audio
 
@@ -29,10 +29,12 @@ router = APIRouter(prefix="/webhook", tags=["WhatsApp"])
 
 @dataclass
 class _ConversacionPendiente:
-    """Datos parciales de un reporte en curso, esperando completar la ubicación."""
+    """Datos parciales de un reporte en curso, esperando completar información faltante."""
     datos: DatosEmergencia
     texto_original: str
     intentos_ubicacion: int = 0
+    esperando_contacto: bool = False
+    intentos_contacto: int = 0
 
 
 # Diccionario keyed por número de WhatsApp (whatsapp:+57...)
@@ -66,6 +68,15 @@ _MENSAJE_PEDIR_UBICACION = (
     "• Barrio o comuna\n"
     "• O un punto de referencia conocido\n\n"
     "También puedes *compartir tu ubicación GPS* desde WhatsApp 📌"
+)
+
+_MENSAJE_PEDIR_CONTACTO = (
+    "Gracias por tu reporte 🙏 Para finalizarlo necesito tu *nombre completo*.\n\n"
+    "Opcionalmente también puedes darme un número de teléfono adicional si deseas.\n\n"
+    "_Estos datos permiten que un funcionario del DAGMA pueda contactarte si necesita "
+    "más detalles para atender correctamente la emergencia. Tu número de WhatsApp "
+    "ya quedará registrado como contacto principal._\n\n"
+    "Si prefieres no dar tu nombre, responde *\"anónimo\"*."
 )
 
 _MENSAJE_ORIENTACION = (
@@ -113,6 +124,24 @@ def _es_consulta_orientacion(texto: str) -> bool:
     if t.endswith("?") and len(t) < 60:
         return True
     return False
+
+
+_PALABRAS_ANONIMO = {
+    "anónimo", "anonimo", "no quiero", "prefiero no", "sin datos",
+    "no doy", "no deseo", "privado", "no dar", "confidencial",
+}
+
+
+def _tiene_contacto(datos: DatosEmergencia) -> bool:
+    """Retorna True si el reporte tiene al menos nombre o teléfono."""
+    return bool((datos.nombre_reportante or "").strip() or (datos.telefono or "").strip())
+
+
+def _completar_telefono(datos: DatosEmergencia, whatsapp_from: str) -> None:
+    """Si el reporte no tiene teléfono, usa el número de WhatsApp como fallback."""
+    if not (datos.telefono or "").strip():
+        # whatsapp_from tiene el formato "whatsapp:+573001234567" → extraer el número
+        datos.telefono = whatsapp_from.removeprefix("whatsapp:")
 
 
 def _tiene_ubicacion(datos: DatosEmergencia) -> bool:
@@ -218,10 +247,11 @@ async def recibir_mensaje_whatsapp(
     Flujo conversacional:
     1. Valida firma Twilio.
     2. Transcribe audio si aplica.
-    3. Si hay una conversación pendiente (falta ubicación), intenta completarla.
+    3. Si hay conversación pendiente (esperando ubicación o contacto), continúa el flujo.
     4. Si no hay pendiente: extrae datos con LLM.
-    5. Si faltan datos clave (ubicación), guarda en memoria y pide al usuario.
-    6. Cuando hay datos completos, guarda en DB y confirma al usuario.
+    5. Si falta ubicación → pedir ubicación.
+    6. Si falta contacto (nombre/teléfono) → pedir contacto.
+    7. Con todos los datos → guardar en DB y confirmar.
     """
     await _validar_firma_twilio(request)
 
@@ -255,19 +285,51 @@ async def recibir_mensaje_whatsapp(
         # Coordenadas GPS del mensaje
         tiene_gps = Latitude is not None and Longitude is not None
 
-        # ── 2. ¿Hay una conversación pendiente esperando ubicación? ────────
+        # ── 2. ¿Hay una conversación pendiente? ───────────────────────────
         pendiente = _conversaciones.get(From)
 
         if pendiente and (texto_nuevo or tiene_gps):
-            # El usuario respondió con su ubicación (o GPS)
             datos = pendiente.datos
 
+            # ── 2a. Esperando datos de contacto ───────────────────────────
+            if pendiente.esperando_contacto:
+                texto_lower = (texto_nuevo or "").lower().strip()
+                es_anonimo = any(p in texto_lower for p in _PALABRAS_ANONIMO)
+
+                if not es_anonimo and texto_nuevo:
+                    try:
+                        contacto = await extraer_contacto(texto_nuevo)
+                        if contacto.nombre_reportante:
+                            datos.nombre_reportante = contacto.nombre_reportante
+                        if contacto.telefono:
+                            datos.telefono = contacto.telefono
+                    except Exception as exc:
+                        logger.warning("No se pudo extraer contacto de '%s': %s", texto_nuevo[:40], exc)
+
+                _completar_telefono(datos, From)
+                if datos.nombre_reportante or es_anonimo or pendiente.intentos_contacto >= 1:
+                    del _conversaciones[From]
+                    reporte = await guardar_reporte(
+                        db=db, datos=datos,
+                        whatsapp_from=From,
+                        texto_original=pendiente.texto_original,
+                    )
+                    logger.info("Reporte #%d completado con contacto para %s", reporte.id, From)
+                    return _twiml_confirmar(reporte, datos)
+                else:
+                    pendiente.intentos_contacto += 1
+                    return _twiml_response(
+                        "Entendido 🙏 Solo necesito tu *nombre completo* y *número de teléfono* "
+                        "para que el DAGMA pueda contactarte si es necesario.\n\n"
+                        "Si prefieres no compartirlos, escribe *\"anónimo\"*."
+                    )
+
+            # ── 2b. Esperando ubicación ────────────────────────────────────
             if tiene_gps:
                 datos.latitud = Latitude
                 datos.longitud = Longitude
                 datos.ubicacion_inferida = f"GPS: {Latitude}, {Longitude}"
             elif texto_nuevo:
-                # Re-extraer solo para obtener la ubicación del texto nuevo
                 datos_ubicacion = await extraer_datos_emergencia(
                     f"Ubicación de la emergencia: {texto_nuevo}"
                 )
@@ -277,20 +339,26 @@ async def recibir_mensaje_whatsapp(
                     datos.ubicacion_inferida = datos_ubicacion.ubicacion_inferida
 
             if _tiene_ubicacion(datos):
-                # Tenemos ubicación — registrar y limpiar estado
+                texto_orig_actualizado = pendiente.texto_original + f" | UBICACIÓN: {texto_nuevo}"
                 del _conversaciones[From]
+                _completar_telefono(datos, From)
+                if not datos.nombre_reportante:
+                    _conversaciones[From] = _ConversacionPendiente(
+                        datos=datos,
+                        texto_original=texto_orig_actualizado,
+                        esperando_contacto=True,
+                    )
+                    return _twiml_response(_MENSAJE_PEDIR_CONTACTO)
                 reporte = await guardar_reporte(
                     db=db, datos=datos,
                     whatsapp_from=From,
-                    texto_original=pendiente.texto_original + f" | UBICACIÓN: {texto_nuevo}",
+                    texto_original=texto_orig_actualizado,
                 )
                 logger.info("Reporte #%d completado para %s", reporte.id, From)
                 return _twiml_confirmar(reporte, datos)
             else:
-                # Todavía sin ubicación útil
                 pendiente.intentos_ubicacion += 1
                 if pendiente.intentos_ubicacion >= 2:
-                    # Después de 2 intentos, registrar con lo que hay
                     del _conversaciones[From]
                     reporte = await guardar_reporte(
                         db=db, datos=datos,
@@ -328,7 +396,6 @@ async def recibir_mensaje_whatsapp(
 
         # ── 5. ¿Tiene ubicación? ──────────────────────────────────────────
         if not _tiene_ubicacion(datos):
-            # Guardar estado y pedir ubicación
             _conversaciones[From] = _ConversacionPendiente(
                 datos=datos,
                 texto_original=texto_original,
@@ -339,7 +406,17 @@ async def recibir_mensaje_whatsapp(
                 + _MENSAJE_PEDIR_UBICACION
             )
 
-        # ── 6. Guardar en DB ──────────────────────────────────────────────
+        # ── 6. ¿Tiene nombre? (teléfono = WhatsApp como fallback) ────────────
+        _completar_telefono(datos, From)
+        if not datos.nombre_reportante:
+            _conversaciones[From] = _ConversacionPendiente(
+                datos=datos,
+                texto_original=texto_original,
+                esperando_contacto=True,
+            )
+            return _twiml_response(_MENSAJE_PEDIR_CONTACTO)
+
+        # ── 7. Guardar en DB ──────────────────────────────────────────────
         reporte = await guardar_reporte(
             db=db, datos=datos,
             whatsapp_from=From,
@@ -366,12 +443,15 @@ def _twiml_confirmar(reporte, datos: DatosEmergencia, sin_ubicacion: bool = Fals
     gravedad_label = _MENSAJES_GRAVEDAD.get(datos.nivel_de_gravedad.value, datos.nivel_de_gravedad.value)
     ubicacion = datos.direccion_hechos or datos.ubicacion_inferida or "ubicación no especificada"
 
+    nombre_linea = f"*Reportante:* {datos.nombre_reportante}\n" if datos.nombre_reportante else ""
+
     nota = ""
     if sin_ubicacion:
         nota = "\n\n⚠️ _Registrado sin ubicación precisa. Un funcionario DAGMA te contactará para confirmarla._"
 
     respuesta = (
         f"✅ *Reporte #{reporte.id} registrado en DAGMA*\n\n"
+        f"{nombre_linea}"
         f"*Tipo:* {tipo_label}\n"
         f"*Gravedad:* {gravedad_label}\n"
         f"*Ubicación:* {ubicacion}\n\n"

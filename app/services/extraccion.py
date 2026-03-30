@@ -8,7 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 
 from app.core.config import get_settings
-from app.schemas.emergencia import DatosEmergencia
+from app.schemas.emergencia import DatosContacto, DatosEmergencia
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,18 @@ _prompt = ChatPromptTemplate.from_messages([
 
 _chain = _prompt | _llm.with_structured_output(DatosEmergencia)
 
+_SYSTEM_CONTACTO = """\
+Extrae del texto el nombre completo y el número de teléfono de la persona.
+Solo devuelve lo que esté explícitamente en el texto. Si no hay nombre o teléfono, deja el campo en null.
+"""
+
+_prompt_contacto = ChatPromptTemplate.from_messages([
+    ("system", _SYSTEM_CONTACTO),
+    ("human", "{texto}"),
+])
+
+_chain_contacto = _prompt_contacto | _llm.with_structured_output(DatosContacto)
+
 
 async def extraer_datos_emergencia(texto: str) -> DatosEmergencia:
     """Analiza *texto* con Llama 3.3 70B (Groq) y retorna un :class:`DatosEmergencia` poblado."""
@@ -87,3 +99,9 @@ async def extraer_datos_emergencia(texto: str) -> DatosEmergencia:
         resultado.nivel_de_gravedad.value,
     )
     return resultado
+
+
+async def extraer_contacto(texto: str) -> DatosContacto:
+    """Extrae nombre y teléfono de un mensaje de respuesta del ciudadano."""
+    logger.info("Extrayendo contacto (%d caracteres)", len(texto))
+    return await _chain_contacto.ainvoke({"texto": texto})
