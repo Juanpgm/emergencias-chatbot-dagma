@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.request_validator import RequestValidator
+from twilio.twiml.messaging_response import MessagingResponse
 
 from app.core.config import get_settings
 from app.core.database import get_db
@@ -19,6 +21,13 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 router = APIRouter(prefix="/webhook", tags=["WhatsApp"])
+
+
+def _twiml_response(mensaje: str) -> Response:
+    """Construye una respuesta TwiML con el texto dado para enviar al usuario por WhatsApp."""
+    resp = MessagingResponse()
+    resp.message(mensaje)
+    return Response(content=str(resp), media_type="application/xml")
 
 
 # ── Validación de firma Twilio ─────────────────────────────────────────────────
@@ -60,7 +69,21 @@ async def verificar_webhook(
 
 # ── Recepción de mensajes (POST) — Twilio ─────────────────────────────────────
 
-@router.post("/whatsapp", response_model=WebhookResponse)
+_MENSAJES_GRAVEDAD = {
+    "alta": "⚠️ URGENTE",
+    "media": "🔶 Atención requerida",
+    "baja": "🔷 Registrado",
+}
+
+_MENSAJES_TIPO = {
+    "arbol_caido": "🌳 Árbol caído",
+    "rescate_animales_silvestres": "🦜 Rescate de animal silvestre",
+    "tala_arboles": "🪓 Tala de árboles",
+    "contaminacion_fuente_hidrica": "💧 Contaminación hídrica",
+}
+
+
+@router.post("/whatsapp")
 async def recibir_mensaje_whatsapp(
     request: Request,
     From: str = Form(...),
@@ -81,6 +104,7 @@ async def recibir_mensaje_whatsapp(
     3. Enviar texto al LLM para extraer datos estructurados.
     4. Enriquecer con coordenadas GPS si se enviaron.
     5. Guardar en tabla maestra + tabla especializada por tipo.
+    6. Responder al usuario con TwiML.
     """
     await _validar_firma_twilio(request)
 
@@ -97,9 +121,9 @@ async def recibir_mensaje_whatsapp(
             texto_para_analizar = Body.strip()
             texto_original = Body.strip()
         else:
-            return WebhookResponse(
-                status="ignored",
-                message="Mensaje sin texto ni audio procesable.",
+            return _twiml_response(
+                "Hola 👋 Por favor envía un mensaje de texto o nota de voz "
+                "describiendo la emergencia ambiental que deseas reportar."
             )
 
         # Agregar coordenadas al contexto si se enviaron
@@ -125,21 +149,30 @@ async def recibir_mensaje_whatsapp(
         )
 
         logger.info("Reporte #%d creado para %s", reporte.id, From)
-        return WebhookResponse(
-            status="ok",
-            message="Reporte registrado exitosamente.",
-            reporte_id=reporte.id,
-            area=reporte.area,
-            tipo=reporte.tipo_de_emergencia,
+
+        # ── 4. Construir respuesta para el usuario ────────────────────────
+        tipo_label = _MENSAJES_TIPO.get(datos.tipo_de_emergencia.value, datos.tipo_de_emergencia.value)
+        gravedad_label = _MENSAJES_GRAVEDAD.get(datos.nivel_de_gravedad.value, datos.nivel_de_gravedad.value)
+        ubicacion = datos.direccion_hechos or datos.ubicacion_inferida or "ubicación no especificada"
+
+        respuesta = (
+            f"✅ *Reporte #{reporte.id} registrado en DAGMA*\n\n"
+            f"*Tipo:* {tipo_label}\n"
+            f"*Gravedad:* {gravedad_label}\n"
+            f"*Ubicación:* {ubicacion}\n\n"
+            f"_{datos.descripcion_emergencia}_\n\n"
+            f"Un equipo del DAGMA atenderá tu reporte. Gracias por cuidar el medio ambiente de Cali 🌿"
         )
+
+        return _twiml_response(respuesta)
 
     except HTTPException:
         raise
     except Exception:
         logger.exception("Error procesando mensaje de %s", From)
-        raise HTTPException(
-            status_code=500,
-            detail="Error interno procesando el reporte.",
+        return _twiml_response(
+            "Lo sentimos, ocurrió un error procesando tu reporte. "
+            "Por favor intenta nuevamente en unos momentos."
         )
 
 
