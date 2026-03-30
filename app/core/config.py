@@ -33,11 +33,19 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def _fix_database_url(cls, v: str) -> str:
-        """Convierte postgresql:// o postgres:// a postgresql+asyncpg:// para asyncpg."""
+        """Convierte postgresql:// o postgres:// a postgresql+asyncpg:// para asyncpg.
+
+        Railway proporciona URLs con postgres:// o postgresql:// sin el driver asyncpg.
+        Además agrega ssl=true para conexiones externas de Railway (hopper.proxy.rlwy.net).
+        """
         if v.startswith("postgres://"):
-            return v.replace("postgres://", "postgresql+asyncpg://", 1)
-        if v.startswith("postgresql://") and "+asyncpg" not in v:
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif v.startswith("postgresql://") and "+asyncpg" not in v:
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        # Agregar SSL para conexiones externas de Railway
+        if "rlwy.net" in v and "ssl=" not in v:
+            sep = "&" if "?" in v else "?"
+            v = f"{v}{sep}ssl=true"
         return v
 
 
