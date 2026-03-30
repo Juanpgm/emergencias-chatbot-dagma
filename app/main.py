@@ -64,9 +64,23 @@ async def health_check():
 
 @app.get("/debug/db")
 async def debug_db():
-    """Diagnóstico temporal: verifica qué tablas existen en la DB."""
+    """Diagnóstico temporal: verifica estado de DB y migraciones."""
+    import os
+    from pathlib import Path
     from sqlalchemy import text
     from app.core.database import async_session_factory
+
+    cwd = os.getcwd()
+    alembic_ini_exists = Path("alembic.ini").exists()
+    alembic_ini_abs = str(Path("alembic.ini").resolve())
+
+    # Intentar correr migraciones y capturar el error exacto
+    migration_error = None
+    try:
+        _run_migrations()
+    except Exception as e:
+        migration_error = str(e)
+
     try:
         async with async_session_factory() as session:
             result = await session.execute(text(
@@ -74,15 +88,18 @@ async def debug_db():
                 "WHERE table_schema = 'public' ORDER BY table_name"
             ))
             tables = [r[0] for r in result.fetchall()]
-
             try:
-                version_result = await session.execute(text(
-                    "SELECT version_num FROM alembic_version"
-                ))
-                versions = [r[0] for r in version_result.fetchall()]
+                vr = await session.execute(text("SELECT version_num FROM alembic_version"))
+                versions = [r[0] for r in vr.fetchall()]
             except Exception as e:
                 versions = [f"ERROR: {e}"]
-
-        return {"status": "connected", "tables": tables, "alembic_version": versions}
+        return {
+            "status": "connected", "cwd": cwd,
+            "alembic_ini_exists": alembic_ini_exists,
+            "alembic_ini_path": alembic_ini_abs,
+            "migration_error": migration_error,
+            "tables": tables, "alembic_version": versions,
+        }
     except Exception as e:
-        return {"status": "error", "detail": str(e)}
+        return {"status": "db_error", "detail": str(e), "cwd": cwd,
+                "alembic_ini_exists": alembic_ini_exists}
