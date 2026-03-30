@@ -23,6 +23,43 @@ settings = get_settings()
 router = APIRouter(prefix="/webhook", tags=["WhatsApp"])
 
 
+_MENSAJE_BIENVENIDA = (
+    "Hola 👋 Soy el asistente de emergencias ambientales del *DAGMA Cali*.\n\n"
+    "Por favor cuéntame qué está pasando. Puedes describir la situación con texto o enviar una nota de voz.\n\n"
+    "Atendemos:\n"
+    "🌳 Árboles caídos\n"
+    "🦜 Rescate de animales silvestres\n"
+    "🪓 Tala ilegal de árboles\n"
+    "💧 Contaminación de fuentes hídricas"
+)
+
+_MENSAJE_PEDIR_DETALLES = (
+    "Gracias por contactarnos 🙏\n\n"
+    "Para registrar tu reporte necesito más información. Por favor indícame:\n\n"
+    "1️⃣ *¿Qué está pasando?* (describe la situación)\n"
+    "2️⃣ *¿Dónde ocurre?* (dirección, barrio o punto de referencia)\n\n"
+    "*Ejemplo:* \"Hay un árbol caído sobre la carrera 8 con calle 15 en el barrio Granada, está bloqueando el paso\""
+)
+
+# Palabras que indican un mensaje demasiado vago para extraer datos
+_FRASES_VAGAS = {
+    "necesito reportar", "quiero reportar", "hola", "buenas", "buenos días",
+    "buenas tardes", "buenas noches", "ayuda", "emergencia", "problema",
+    "denuncia", "reportar", "quiero hacer un reporte", "como reportar",
+}
+
+
+def _es_mensaje_vago(texto: str) -> bool:
+    """Retorna True si el texto es demasiado corto o vago para extraer datos."""
+    texto_lower = texto.lower().strip()
+    if len(texto_lower) < 25:
+        return True
+    for frase in _FRASES_VAGAS:
+        if texto_lower == frase or texto_lower == frase + " una emergencia":
+            return True
+    return False
+
+
 def _twiml_response(mensaje: str) -> Response:
     """Construye una respuesta TwiML con el texto dado para enviar al usuario por WhatsApp."""
     resp = MessagingResponse()
@@ -125,10 +162,11 @@ async def recibir_mensaje_whatsapp(
             texto_para_analizar = Body.strip()
             texto_original = Body.strip()
         else:
-            return _twiml_response(
-                "Hola 👋 Por favor envía un mensaje de texto o nota de voz "
-                "describiendo la emergencia ambiental que deseas reportar."
-            )
+            return _twiml_response(_MENSAJE_BIENVENIDA)
+
+        # Si el mensaje es demasiado corto o vago, pedir más detalles
+        if _es_mensaje_vago(texto_para_analizar):
+            return _twiml_response(_MENSAJE_PEDIR_DETALLES)
 
         # Agregar coordenadas al contexto si se enviaron
         if Latitude is not None and Longitude is not None:
@@ -172,11 +210,12 @@ async def recibir_mensaje_whatsapp(
 
     except HTTPException:
         raise
-    except Exception:
-        logger.exception("Error procesando mensaje de %s", From)
+    except Exception as e:
+        logger.exception("Error procesando mensaje de %s: %s", From, e)
         return _twiml_response(
             "Lo sentimos, ocurrió un error procesando tu reporte. "
-            "Por favor intenta nuevamente en unos momentos."
+            "Por favor intenta nuevamente en unos momentos.\n\n"
+            f"(Error: {type(e).__name__})"
         )
 
 
