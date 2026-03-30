@@ -83,20 +83,23 @@ def _es_mensaje_vago(texto: str) -> bool:
 
 
 def _tiene_ubicacion(datos: DatosEmergencia) -> bool:
-    """Retorna True si el reporte tiene una ubicación útil (no genérica)."""
-    ubicaciones_vagas = {
-        None, "", "barrio del reportante", "no especificada", "ubicación no especificada",
+    """Retorna True si el reporte tiene una ubicación útil y específica (no genérica)."""
+    _PALABRAS_VAGAS = {
+        "barrio", "calle", "carrera", "mi barrio", "mi casa", "mi casa",
+        "aquí", "acá", "cerca", "el barrio", "la calle", "zona",
+        "sector", "el sector", "la zona", "mi sector",
+        "barrio del reportante", "no especificada", "ubicación no especificada",
         "desconocida", "no especificado", "sin ubicación", "sin dirección",
+        "no se especifica", "no disponible",
     }
-    dir_hechos = (datos.direccion_hechos or "").strip().lower()
-    ub_inferida = (datos.ubicacion_inferida or "").strip().lower()
 
     if datos.latitud is not None and datos.longitud is not None:
         return True
-    if dir_hechos and dir_hechos not in ubicaciones_vagas and len(dir_hechos) > 5:
-        return True
-    if ub_inferida and ub_inferida not in ubicaciones_vagas and len(ub_inferida) > 5:
-        return True
+
+    for campo in (datos.direccion_hechos, datos.ubicacion_inferida):
+        valor = (campo or "").strip().lower()
+        if valor and valor not in _PALABRAS_VAGAS and len(valor) >= 12:
+            return True
     return False
 
 
