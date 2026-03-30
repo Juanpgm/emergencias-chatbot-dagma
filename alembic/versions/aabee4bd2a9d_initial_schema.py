@@ -41,15 +41,8 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
-    # Intentar agregar columna geom solo si PostGIS está disponible (local con Docker)
-    try:
-        op.add_column('reportes_emergencia',
-            sa.Column('geom', geoalchemy2.types.Geometry(
-                geometry_type='POINT', srid=4326, from_text='ST_GeomFromEWKT', name='geometry'
-            ), nullable=True)
-        )
-    except Exception:
-        pass  # PostGIS no disponible (Railway PostgreSQL estándar), se omite la columna geom
+    # La columna geom (PostGIS) se omite aquí — no es necesaria para el sistema
+    # y Railway usa PostgreSQL estándar sin PostGIS.
     # ### end Alembic commands ###
 
 

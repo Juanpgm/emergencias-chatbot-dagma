@@ -19,14 +19,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Eliminar columna geom si existe (solo existe en entornos con PostGIS como Docker local)
-    conn = op.get_bind()
-    result = conn.execute(text(
-        "SELECT 1 FROM information_schema.columns "
-        "WHERE table_name='reportes_emergencia' AND column_name='geom'"
-    ))
-    if result.fetchone():
-        op.drop_column("reportes_emergencia", "geom")
+    # No-op: la columna geom ya no se crea en la migración inicial,
+    # por lo que no hay nada que eliminar.
+    pass
 
 
 def downgrade() -> None:
