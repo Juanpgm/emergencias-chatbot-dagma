@@ -8,7 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 
 from app.core.config import get_settings
-from app.schemas.emergencia import DatosContacto, DatosEmergencia
+from app.schemas.emergencia import DatosContacto, DatosEmergencia, DatosUbicacion
 
 logger = logging.getLogger(__name__)
 
@@ -105,3 +105,23 @@ async def extraer_contacto(texto: str) -> DatosContacto:
     """Extrae nombre y teléfono de un mensaje de respuesta del ciudadano."""
     logger.info("Extrayendo contacto (%d caracteres)", len(texto))
     return await _chain_contacto.ainvoke({"texto": texto})
+
+
+_SYSTEM_UBICACION = """\
+Extrae del texto la dirección o ubicación donde ocurre la emergencia en Cali, Colombia.
+Devuelve la dirección exacta si la hay (calle, carrera, número) y/o la ubicación inferida
+(barrio, comuna, punto de referencia). Solo usa lo que esté en el texto; deja null si no hay datos.
+"""
+
+_prompt_ubicacion = ChatPromptTemplate.from_messages([
+    ("system", _SYSTEM_UBICACION),
+    ("human", "{texto}"),
+])
+
+_chain_ubicacion = _prompt_ubicacion | _llm.with_structured_output(DatosUbicacion)
+
+
+async def extraer_ubicacion(texto: str) -> DatosUbicacion:
+    """Extrae dirección y ubicación inferida de un mensaje de seguimiento."""
+    logger.info("Extrayendo ubicación (%d caracteres)", len(texto))
+    return await _chain_ubicacion.ainvoke({"texto": texto})

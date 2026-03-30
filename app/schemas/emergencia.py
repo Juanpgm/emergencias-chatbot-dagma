@@ -106,6 +106,17 @@ class DatosContacto(BaseModel):
     )
 
 
+class DatosUbicacion(BaseModel):
+    """Ubicación extraída de un mensaje de seguimiento del ciudadano."""
+
+    direccion_hechos: Optional[str] = Field(
+        None, description="Dirección exacta donde ocurrieron los hechos (calle, carrera, número)."
+    )
+    ubicacion_inferida: Optional[str] = Field(
+        None, description="Ubicación inferida: barrio, comuna o punto de referencia en Cali."
+    )
+
+
 # ── Payload entrante de WhatsApp ───────────────────────────────────────────────
 
 class WhatsAppMessage(BaseModel):

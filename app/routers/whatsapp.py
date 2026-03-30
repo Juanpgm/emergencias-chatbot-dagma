@@ -15,7 +15,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.schemas.emergencia import DatosEmergencia
-from app.services.extraccion import extraer_contacto, extraer_datos_emergencia
+from app.services.extraccion import extraer_contacto, extraer_datos_emergencia, extraer_ubicacion
 from app.services.persistencia import guardar_reporte
 from app.services.transcripcion import transcribir_audio
 
@@ -330,13 +330,15 @@ async def recibir_mensaje_whatsapp(
                 datos.longitud = Longitude
                 datos.ubicacion_inferida = f"GPS: {Latitude}, {Longitude}"
             elif texto_nuevo:
-                datos_ubicacion = await extraer_datos_emergencia(
-                    f"Ubicación de la emergencia: {texto_nuevo}"
-                )
-                if datos_ubicacion.direccion_hechos:
-                    datos.direccion_hechos = datos_ubicacion.direccion_hechos
-                if datos_ubicacion.ubicacion_inferida:
-                    datos.ubicacion_inferida = datos_ubicacion.ubicacion_inferida
+                try:
+                    datos_ubicacion = await extraer_ubicacion(texto_nuevo)
+                    if datos_ubicacion.direccion_hechos:
+                        datos.direccion_hechos = datos_ubicacion.direccion_hechos
+                    if datos_ubicacion.ubicacion_inferida:
+                        datos.ubicacion_inferida = datos_ubicacion.ubicacion_inferida
+                except Exception as exc:
+                    logger.warning("extraer_ubicacion falló ('%s'): %s — usando texto directo", texto_nuevo[:40], exc)
+                    datos.ubicacion_inferida = texto_nuevo
 
             if _tiene_ubicacion(datos):
                 texto_orig_actualizado = pendiente.texto_original + f" | UBICACIÓN: {texto_nuevo}"
