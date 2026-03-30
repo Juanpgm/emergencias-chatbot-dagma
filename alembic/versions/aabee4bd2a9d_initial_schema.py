@@ -34,7 +34,6 @@ def upgrade() -> None:
     sa.Column('ubicacion_inferida', sa.String(length=500), nullable=True),
     sa.Column('latitud', sa.Float(), nullable=True),
     sa.Column('longitud', sa.Float(), nullable=True),
-    sa.Column('geom', geoalchemy2.types.Geometry(geometry_type='POINT', srid=4326, from_text='ST_GeomFromEWKT', name='geometry'), nullable=True),
     sa.Column('nivel_de_gravedad', sa.Enum('alta', 'media', 'baja', name='nivel_gravedad_enum', create_constraint=True), nullable=False),
     sa.Column('requiere_atencion_inmediata', sa.Boolean(), nullable=False),
     sa.Column('texto_original', sa.Text(), nullable=True),
@@ -42,7 +41,15 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
-    # geoalchemy2 crea el índice GIST automáticamente en la columna geom
+    # Intentar agregar columna geom solo si PostGIS está disponible (local con Docker)
+    try:
+        op.add_column('reportes_emergencia',
+            sa.Column('geom', geoalchemy2.types.Geometry(
+                geometry_type='POINT', srid=4326, from_text='ST_GeomFromEWKT', name='geometry'
+            ), nullable=True)
+        )
+    except Exception:
+        pass  # PostGIS no disponible (Railway PostgreSQL estándar), se omite la columna geom
     # ### end Alembic commands ###
 
 

@@ -8,6 +8,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
 
 
 # revision identifiers, used by Alembic.
@@ -18,8 +19,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Eliminar columna geom (requería PostGIS, no disponible en Railway Postgres)
-    op.drop_column("reportes_emergencia", "geom")
+    # Eliminar columna geom si existe (solo existe en entornos con PostGIS como Docker local)
+    conn = op.get_bind()
+    result = conn.execute(text(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name='reportes_emergencia' AND column_name='geom'"
+    ))
+    if result.fetchone():
+        op.drop_column("reportes_emergencia", "geom")
 
 
 def downgrade() -> None:
