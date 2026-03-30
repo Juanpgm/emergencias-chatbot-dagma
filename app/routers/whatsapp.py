@@ -44,12 +44,16 @@ async def _validar_firma_twilio(request: Request) -> None:
 
     validator = RequestValidator(settings.twilio_auth_token)
     signature = request.headers.get("X-Twilio-Signature", "")
-    url = str(request.url)
+
+    # Reconstruir URL con https:// usando X-Forwarded-Proto (Railway usa proxy inverso)
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    url = str(request.url).replace(f"{request.url.scheme}://", f"{proto}://", 1)
+
     form_data = await request.form()
     params = dict(form_data)
 
     if not validator.validate(url, params, signature):
-        logger.warning("Firma Twilio inválida desde %s", request.client.host)
+        logger.warning("Firma Twilio inválida desde %s — url=%s", request.client.host, url)
         raise HTTPException(status_code=403, detail="Firma de Twilio inválida.")
 
 
