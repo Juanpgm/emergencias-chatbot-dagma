@@ -60,3 +60,23 @@ app.include_router(reportes.router)
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "dagma-emergencias-bot"}
+
+
+@app.get("/debug/db")
+async def debug_db():
+    """Diagnóstico temporal: verifica qué tablas existen en la DB."""
+    from sqlalchemy import text
+    from app.core.database import async_session_factory
+    async with async_session_factory() as session:
+        result = await session.execute(text(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = 'public' ORDER BY table_name"
+        ))
+        tables = [r[0] for r in result.fetchall()]
+
+        version_result = await session.execute(text(
+            "SELECT version_num FROM alembic_version"
+        ))
+        versions = [r[0] for r in version_result.fetchall()]
+
+    return {"tables": tables, "alembic_version": versions}
