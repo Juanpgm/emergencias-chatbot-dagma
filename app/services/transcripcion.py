@@ -32,8 +32,13 @@ async def descargar_audio(url: str) -> Path:
     if settings.twilio_account_sid and settings.twilio_auth_token:
         auth = (settings.twilio_account_sid, settings.twilio_auth_token)
 
-    async with httpx.AsyncClient(timeout=60, auth=auth) as client:
+    async with httpx.AsyncClient(timeout=60, auth=auth, follow_redirects=True) as client:
         response = await client.get(url)
+        if not response.is_success:
+            logger.error(
+                "Error descargando audio de Twilio: HTTP %d — URL: %s — Body: %.200s",
+                response.status_code, url, response.text,
+            )
         response.raise_for_status()
 
     # Determinar extensión a partir del Content-Type

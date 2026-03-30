@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+import httpx
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -199,8 +200,22 @@ async def recibir_mensaje_whatsapp(
         # ── 1. Obtener texto del mensaje ───────────────────────────────────
         if NumMedia > 0 and MediaUrl0 and _es_audio(MediaContentType0):
             logger.info("Procesando nota de voz de %s", From)
-            texto_nuevo = await transcribir_audio(MediaUrl0)
-            texto_original = f"[AUDIO TRANSCRITO] {texto_nuevo}"
+            try:
+                texto_nuevo = await transcribir_audio(MediaUrl0)
+                texto_original = f"[AUDIO TRANSCRITO] {texto_nuevo}"
+            except httpx.HTTPStatusError as exc:
+                logger.error("Fallo al transcribir audio de %s: HTTP %d", From, exc.response.status_code)
+                return _twiml_response(
+                    "No pude procesar tu nota de voz 🎙️\n\n"
+                    "Por favor escribe tu reporte en texto. Ejemplo:\n"
+                    "_\"Hay un árbol caído en la calle 5 con carrera 10, barrio Granada\"_"
+                )
+            except Exception as exc:
+                logger.error("Error inesperado transcribiendo audio de %s: %s", From, exc)
+                return _twiml_response(
+                    "No pude procesar tu nota de voz 🎙️\n\n"
+                    "Por favor escribe tu reporte en texto."
+                )
         elif Body:
             texto_nuevo = Body.strip()
             texto_original = Body.strip()
