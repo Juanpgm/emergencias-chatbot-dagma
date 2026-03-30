@@ -68,6 +68,17 @@ _MENSAJE_PEDIR_UBICACION = (
     "También puedes *compartir tu ubicación GPS* desde WhatsApp 📌"
 )
 
+_MENSAJE_ORIENTACION = (
+    "Soy el asistente de emergencias ambientales del *DAGMA Cali* 🌿\n\n"
+    "Puedes reportarme cualquiera de estas situaciones:\n\n"
+    "🌳 *Árbol caído* — que bloquee una vía o represente peligro\n"
+    "🦜 *Rescate de animal silvestre* — herido, atrapado o en peligro\n"
+    "🪓 *Tala ilegal* — corte no autorizado de árboles nativos\n"
+    "💧 *Contaminación hídrica* — ríos, quebradas o humedales afectados\n\n"
+    "Para hacer tu reporte escríbeme *qué está pasando* y *dónde ocurre* en Cali.\n\n"
+    "_Ejemplo: \"Hay un árbol caído sobre la carrera 8 con calle 15, barrio Granada\"_"
+)
+
 # Frases que indican un mensaje sin información útil
 _FRASES_VAGAS = {
     "necesito reportar", "quiero reportar", "hola", "buenas", "buenos días",
@@ -76,11 +87,32 @@ _FRASES_VAGAS = {
     "necesito reportar una emergencia", "quiero reportar una emergencia",
 }
 
+# Fragmentos que indican pregunta de orientación sobre el servicio
+_FRASES_ORIENTACION = {
+    "para qué es", "para que es", "para qué sirve", "para que sirve",
+    "qué es esto", "que es esto", "qué hace", "que hace", "qué puedo",
+    "que puedo", "cómo funciona", "como funciona", "cómo se usa", "como se usa",
+    "qué se puede", "que se puede", "qué reporto", "que reporto",
+    "en qué te puedo", "en que te puedo", "qué tipos", "que tipos",
+    "qué emergencias", "que emergencias",
+}
+
 
 def _es_mensaje_vago(texto: str) -> bool:
     """Retorna True si el texto es demasiado corto o vago para extraer datos."""
     t = texto.lower().strip()
     return len(t) < 25 or t in _FRASES_VAGAS
+
+
+def _es_consulta_orientacion(texto: str) -> bool:
+    """Retorna True si el mensaje es una pregunta sobre qué hace el servicio."""
+    t = texto.lower().strip()
+    if any(frase in t for frase in _FRASES_ORIENTACION):
+        return True
+    # Preguntas cortas genéricas (terminan en "?" y son < 60 chars)
+    if t.endswith("?") and len(t) < 60:
+        return True
+    return False
 
 
 def _tiene_ubicacion(datos: DatosEmergencia) -> bool:
@@ -276,12 +308,19 @@ async def recibir_mensaje_whatsapp(
         if _es_mensaje_vago(texto_nuevo):
             return _twiml_response(_MENSAJE_PEDIR_DETALLES)
 
+        if _es_consulta_orientacion(texto_nuevo):
+            return _twiml_response(_MENSAJE_ORIENTACION)
+
         texto_para_llm = texto_nuevo
         if tiene_gps:
             texto_para_llm += f"\n\n[Ubicación GPS: lat={Latitude}, lon={Longitude}]"
 
         # ── 4. Extraer datos con LLM ──────────────────────────────────────
-        datos = await extraer_datos_emergencia(texto_para_llm)
+        try:
+            datos = await extraer_datos_emergencia(texto_para_llm)
+        except Exception as exc:
+            logger.warning("LLM no pudo extraer datos de '%s...': %s", texto_nuevo[:50], exc)
+            return _twiml_response(_MENSAJE_ORIENTACION)
 
         if tiene_gps:
             datos.latitud = Latitude
