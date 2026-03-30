@@ -22,15 +22,12 @@ _SUPPORTED_EXTENSIONS = {".ogg", ".mp3", ".mp4", ".m4a", ".wav", ".webm", ".mpeg
 
 
 async def descargar_audio(url: str) -> Path:
-    """Descarga un archivo de audio desde *url* y lo guarda en un directorio temporal.
+    """Descarga un archivo de audio desde *url* y lo guarda en un directorio temporal del sistema.
 
     Los archivos de media de Twilio requieren autenticación Basic con Account SID y Auth Token.
     Si las credenciales no están configuradas, hace la descarga sin autenticación.
     Retorna la ruta local del archivo descargado.
     """
-    temp_dir = Path(settings.temp_audio_dir)
-    temp_dir.mkdir(parents=True, exist_ok=True)
-
     auth = None
     if settings.twilio_account_sid and settings.twilio_auth_token:
         auth = (settings.twilio_account_sid, settings.twilio_auth_token)
@@ -43,7 +40,8 @@ async def descargar_audio(url: str) -> Path:
     content_type = response.headers.get("content-type", "")
     ext = _content_type_to_ext(content_type)
 
-    fd, tmp_path = tempfile.mkstemp(suffix=ext, dir=str(temp_dir))
+    # Usar el directorio temporal del sistema operativo (funciona en Linux y Windows)
+    fd, tmp_path = tempfile.mkstemp(suffix=ext)
     os.close(fd)
     Path(tmp_path).write_bytes(response.content)
 
