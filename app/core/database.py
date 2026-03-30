@@ -8,7 +8,7 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-_connect_args: dict = {}
+_connect_args: dict = {"ssl": False}
 
 engine = create_async_engine(
     settings.database_url,
