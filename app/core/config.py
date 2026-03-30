@@ -42,10 +42,6 @@ class Settings(BaseSettings):
             v = v.replace("postgres://", "postgresql+asyncpg://", 1)
         elif v.startswith("postgresql://") and "+asyncpg" not in v:
             v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
-        # asyncpg requiere sslmode=require para conexiones externas de Railway
-        if "rlwy.net" in v and "sslmode=" not in v:
-            sep = "&" if "?" in v else "?"
-            v = f"{v}{sep}sslmode=require"
         return v
 
 

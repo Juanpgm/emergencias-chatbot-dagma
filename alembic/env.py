@@ -1,4 +1,4 @@
-"""Configuración de migraciones Alembic para entorno async con PostGIS."""
+"""Configuración de migraciones Alembic — async, compatible con Railway."""
 
 from __future__ import annotations
 
@@ -7,9 +7,10 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import get_settings
+from app.core.database import _connect_args  # reutiliza configuración SSL
 from app.models.emergencia import Base
 
 config = context.config
@@ -37,10 +38,10 @@ def do_run_migrations(connection):
 
 
 async def run_async_migrations() -> None:
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    connectable = create_async_engine(
+        settings.database_url,
         poolclass=pool.NullPool,
+        connect_args=_connect_args,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
