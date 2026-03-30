@@ -67,16 +67,22 @@ async def debug_db():
     """Diagnóstico temporal: verifica qué tablas existen en la DB."""
     from sqlalchemy import text
     from app.core.database import async_session_factory
-    async with async_session_factory() as session:
-        result = await session.execute(text(
-            "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = 'public' ORDER BY table_name"
-        ))
-        tables = [r[0] for r in result.fetchall()]
+    try:
+        async with async_session_factory() as session:
+            result = await session.execute(text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' ORDER BY table_name"
+            ))
+            tables = [r[0] for r in result.fetchall()]
 
-        version_result = await session.execute(text(
-            "SELECT version_num FROM alembic_version"
-        ))
-        versions = [r[0] for r in version_result.fetchall()]
+            try:
+                version_result = await session.execute(text(
+                    "SELECT version_num FROM alembic_version"
+                ))
+                versions = [r[0] for r in version_result.fetchall()]
+            except Exception as e:
+                versions = [f"ERROR: {e}"]
 
-    return {"tables": tables, "alembic_version": versions}
+        return {"status": "connected", "tables": tables, "alembic_version": versions}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
