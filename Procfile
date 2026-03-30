@@ -1,1 +1,1 @@
-web: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+web: PYTHONPATH=/app alembic upgrade head && PYTHONPATH=/app uvicorn app.main:app --host 0.0.0.0 --port $PORT
