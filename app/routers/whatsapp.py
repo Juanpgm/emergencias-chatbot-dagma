@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 
-from app.core.config import get_settings
-from app.core.database import get_db
-from app.schemas.emergencia import DatosEmergencia
+from shared.core.config import get_settings
+from shared.core.database import get_db
+from shared.schemas.emergencia import DatosEmergencia
 from app.services.extraccion import extraer_contacto, extraer_datos_emergencia, extraer_ubicacion
 from app.services.persistencia import guardar_reporte
 from app.services.transcripcion import transcribir_audio

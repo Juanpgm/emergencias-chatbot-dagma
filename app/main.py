@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.core.config import get_settings
+from shared.core.config import get_settings
 from app.routers import reportes, whatsapp
 
 settings = get_settings()

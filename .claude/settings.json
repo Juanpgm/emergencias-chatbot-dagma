@@ -4,6 +4,9 @@
     "allow": [
       "Read(**)",
       "Write(app/**)",
+      "Write(chatbot/**)",
+      "Write(admin/**)",
+      "Write(shared/**)",
       "Write(tests/**)",
       "Write(alembic/**)",
       "Write(CLAUDE.md)",
@@ -13,8 +16,10 @@
       "Write(README.md)",
       "Write(requirements.txt)",
       "Write(pyproject.toml)",
-      "Write(.claude/**)",
+      "Write(docker-compose.yml)",
+      "Write(.env.example)",
       "Write(.gitignore)",
+      "Write(.claude/**)",
       "Bash(pip*)",
       "Bash(uvicorn*)",
       "Bash(alembic*)",
@@ -39,8 +44,7 @@
     ],
     "deny": [
       "Bash(rm -rf /)",
-      "Bash(git push --force*)",
-      "Write(.env)"
+      "Bash(git push --force*)"
     ]
   }
 }

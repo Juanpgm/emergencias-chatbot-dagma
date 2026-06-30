@@ -14,13 +14,13 @@ from app.schemas.emergencia import (
 
 def test_datos_emergencia_campos_minimos():
     datos = DatosEmergencia(
-        tipo_de_emergencia=TipoEmergencia.incendio_forestal,
-        descripcion_emergencia="Incendio activo",
-        descripcion_detallada="Incendio forestal activo en zona urbana",
+        tipo_de_emergencia=TipoEmergencia.arbol_caido,
+        descripcion_emergencia="Árbol caído en la vía",
+        descripcion_detallada="Árbol de gran tamaño caído obstruyendo la calle",
         nivel_de_gravedad=NivelGravedad.alta,
         requiere_atencion_inmediata=True,
     )
-    assert datos.tipo_de_emergencia == TipoEmergencia.incendio_forestal
+    assert datos.tipo_de_emergencia == TipoEmergencia.arbol_caido
     assert datos.nombre_reportante is None
     assert datos.latitud is None
 
@@ -32,7 +32,7 @@ def test_datos_emergencia_todos_los_campos():
         email="maria@example.com",
         direccion_hechos="Calle 5 # 23-10, Cali",
         direccion_persona="Carrera 100 # 11-30",
-        tipo_de_emergencia=TipoEmergencia.contaminacion_agua,
+        tipo_de_emergencia=TipoEmergencia.contaminacion_fuente_hidrica,
         descripcion_emergencia="Vertimiento en el río Cali",
         descripcion_detallada="Se observa vertimiento de sustancia color oscuro en el río Cali, a la altura del puente Ortiz.",
         ubicacion_inferida="Puente Ortiz, Centro, Cali",
@@ -74,6 +74,8 @@ def test_nivel_gravedad_valores():
 
 
 def test_tipo_emergencia_valores():
-    assert len(TipoEmergencia) == 11
-    assert TipoEmergencia.incendio_forestal.value == "incendio_forestal"
-    assert TipoEmergencia.otro.value == "otro"
+    assert len(TipoEmergencia) == 4
+    assert TipoEmergencia.arbol_caido.value == "arbol_caido"
+    assert TipoEmergencia.rescate_animales_silvestres.value == "rescate_animales_silvestres"
+    assert TipoEmergencia.tala_arboles.value == "tala_arboles"
+    assert TipoEmergencia.contaminacion_fuente_hidrica.value == "contaminacion_fuente_hidrica"

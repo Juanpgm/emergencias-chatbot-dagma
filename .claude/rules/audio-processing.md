@@ -1,13 +1,15 @@
 ---
 paths:
-  - "app/services/transcripcion.py"
+  - "shared/services/transcripcion.py"
 ---
 
 # Audio Processing — Reglas
 
 - Descargar con `httpx.AsyncClient` (timeout=60s).
-- Guardar en directorio temporal configurado en `TEMP_AUDIO_DIR`.
-- Usar `tempfile.mkstemp()` para nombres únicos; limpiar con `unlink()` en finally.
+- Límite de tamaño: 25 MB — rechazar antes de descargar completo.
+- Guardar en archivo temporal; limpiar con `unlink()` en bloque `finally`.
 - Extensión basada en Content-Type del response.
-- API Whisper: modelo `whisper-1`, idioma `es`, formato `text`.
-- Operación asíncrona: `await client.audio.transcriptions.create()`.
+- API Whisper: **Groq** `whisper-large-v3-turbo`, NO OpenAI. API key: `settings.groq_api_key`.
+- Invocar con `await groq_client.audio.transcriptions.create(...)`.
+- Idioma: `es`. Response format: `text`.
+- Código canónico en `shared/services/transcripcion.py`.

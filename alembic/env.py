@@ -7,8 +7,8 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from app.core.config import get_settings
-from app.models.emergencia import Base
+from shared.core.config import get_settings
+from shared.models.emergencia import Base
 
 config = context.config
 
@@ -36,11 +36,12 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    sslmode = "disable" if settings.app_env == "development" else "require"
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        connect_args={"sslmode": "disable"},
+        connect_args={"sslmode": sslmode},
     )
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

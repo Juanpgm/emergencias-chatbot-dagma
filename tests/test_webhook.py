@@ -45,14 +45,16 @@ async def test_webhook_texto_valido(client, mock_extraccion, mock_guardar_report
         "/webhook/whatsapp",
         data={
             "From": "whatsapp:+573001234567",
-            "Body": "Hay un incendio forestal en el cerro de las Tres Cruces",
+            "Body": "Hay un árbol caído en el cerro de las Tres Cruces",
             "NumMedia": "0",
         },
     )
     assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ok"
-    assert data["reporte_id"] == 42
+    assert response.headers["content-type"] == "application/xml"
+    body = response.text
+    assert "<Response>" in body
+    assert "<Message>" in body
+    assert "Reporte #42" in body
 
     mock_extraccion.assert_called_once()
     mock_guardar_reporte.assert_called_once()
@@ -73,8 +75,9 @@ async def test_webhook_audio(
         },
     )
     assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ok"
+    assert response.headers["content-type"] == "application/xml"
+    body = response.text
+    assert "<Response>" in body
 
     mock_transcripcion.assert_called_once_with("https://api.twilio.com/audio/test.ogg")
     mock_extraccion.assert_called_once()
@@ -90,8 +93,10 @@ async def test_webhook_mensaje_vacio(client):
         },
     )
     assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ignored"
+    assert response.headers["content-type"] == "application/xml"
+    body = response.text
+    assert "Hola" in body
+    assert "asistente de emergencias" in body
 
 
 @pytest.mark.asyncio
@@ -100,15 +105,14 @@ async def test_webhook_con_ubicacion(client, mock_extraccion, mock_guardar_repor
         "/webhook/whatsapp",
         data={
             "From": "whatsapp:+573001234567",
-            "Body": "Hay tala ilegal",
+            "Body": "Hay tala ilegal en el cerro de las Tres Cruces, varias personas cortando árboles",
             "NumMedia": "0",
             "Latitude": "3.4516",
             "Longitude": "-76.5320",
         },
     )
     assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ok"
+    assert response.headers["content-type"] == "application/xml"
 
     # Verificar que se pasaron las coordenadas al LLM
     call_args = mock_extraccion.call_args

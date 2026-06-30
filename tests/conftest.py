@@ -17,6 +17,13 @@ async def _override_get_db():
     yield AsyncMock()
 
 
+@pytest.fixture(autouse=True)
+def _desactivar_twilio():
+    """Desactiva validación de firma Twilio durante tests."""
+    with patch("app.routers.whatsapp._validar_firma_twilio", new_callable=AsyncMock):
+        yield
+
+
 @pytest.fixture
 async def client():
     """Cliente HTTP asíncrono para tests de endpoints."""
@@ -36,9 +43,9 @@ def datos_emergencia_mock() -> DatosEmergencia:
         email=None,
         direccion_hechos="Cerro de las Tres Cruces, Cali",
         direccion_persona=None,
-        tipo_de_emergencia=TipoEmergencia.incendio_forestal,
-        descripcion_emergencia="Incendio forestal activo en el cerro.",
-        descripcion_detallada="Se reporta un incendio forestal activo en el cerro de las Tres Cruces, zona occidental de Cali.",
+        tipo_de_emergencia=TipoEmergencia.arbol_caido,
+        descripcion_emergencia="Árbol caído obstruyendo la vía.",
+        descripcion_detallada="Se reporta un árbol de gran tamaño caído en el cerro de las Tres Cruces, zona occidental de Cali.",
         ubicacion_inferida="Cerro de las Tres Cruces, Comuna 1, Cali",
         latitud=3.4516,
         longitud=-76.5320,

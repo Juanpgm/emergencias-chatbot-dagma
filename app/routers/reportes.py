@@ -8,15 +8,15 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.models.emergencia import (
+from shared.core.database import get_db
+from shared.models.emergencia import (
     EmergenciaFaunaRescate,
     EmergenciaFloraArbolCaido,
     EmergenciaFloraIVCTala,
     EmergenciaHidricaContaminacion,
     ReporteEmergencia,
 )
-from app.schemas.emergencia import ReporteResponse
+from shared.schemas.emergencia import ReporteResponse
 
 logger = logging.getLogger(__name__)
 

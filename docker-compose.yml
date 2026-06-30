@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgis/postgis:16-3.4
+    image: postgres:16-alpine
     container_name: dagma_postgres
     environment:
       POSTGRES_USER: dagma_user
@@ -13,7 +13,18 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dagma_user -d emergencias_dagma"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: dagma_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
       retries: 10
 
 volumes:
