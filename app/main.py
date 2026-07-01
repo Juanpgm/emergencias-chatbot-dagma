@@ -13,6 +13,7 @@ if sys.platform == "win32":
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from shared.core.config import get_settings
 from app.routers import chat_ui, reportes, test_chat, whatsapp
@@ -51,6 +52,13 @@ app = FastAPI(
     description="Backend para atención de emergencias ambientales vía WhatsApp.",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 app.include_router(whatsapp.router)
