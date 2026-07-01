@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from shared.core.config import get_settings
-from app.routers import reportes, test_chat, whatsapp
+from app.routers import chat_ui, reportes, test_chat, whatsapp
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -56,6 +56,7 @@ app = FastAPI(
 app.include_router(whatsapp.router)
 app.include_router(reportes.router)
 app.include_router(test_chat.router)
+app.include_router(chat_ui.router)
 
 
 @app.get("/health")
