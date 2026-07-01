@@ -6,10 +6,9 @@ from shared.core.config import get_settings
 
 settings = get_settings()
 
-# SSL deshabilitado solo en development; en otros entornos asyncpg negocia TLS automáticamente
-_ssl = False if settings.app_env == "development" else True
-_connect_args: dict = {"ssl": _ssl}
-
+# SSL is handled by sslmode=require in the DATABASE_URL.
+# Do not pass ssl in connect_args — it conflicts with asyncpg when sslmode is
+# already in the URL and causes unhandled exceptions during connection.
 engine = create_async_engine(
     settings.database_url,
     echo=(settings.app_env == "development"),
@@ -17,7 +16,6 @@ engine = create_async_engine(
     max_overflow=10,
     pool_pre_ping=True,
     pool_recycle=3600,
-    connect_args=_connect_args,
 )
 
 async_session_factory = async_sessionmaker(engine, expire_on_commit=False)

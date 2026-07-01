@@ -32,8 +32,12 @@ class RefreshRequest(BaseModel):
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     settings = get_settings()
 
-    result = await db.execute(select(AdminUser).where(AdminUser.username == body.username))
-    user = result.scalar_one_or_none()
+    try:
+        result = await db.execute(select(AdminUser).where(AdminUser.username == body.username))
+        user = result.scalar_one_or_none()
+    except Exception:
+        logger.exception("DB error en /auth/login")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error")
 
     if not user:
         # Bootstrap: crea el primer admin desde variables de entorno la primera vez
