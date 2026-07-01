@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "change-me-in-production"
     admin_username: str = "admin"
     admin_password: str = "change-me-in-production"
+    firebase_api_key: str = ""
+    firebase_allowed_domains: str = "gmail.com,cali.gov.co"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 

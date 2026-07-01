@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import JWTError, jwt
 from pydantic import BaseModel
@@ -49,6 +50,61 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     sub = f"user:{body.username}"
+    return TokenResponse(
+        access_token=create_access_token(sub),
+        refresh_token=create_refresh_token(sub),
+    )
+
+
+class FirebaseLoginRequest(BaseModel):
+    id_token: str
+
+
+@router.post("/firebase", response_model=TokenResponse)
+async def firebase_login(body: FirebaseLoginRequest, db: AsyncSession = Depends(get_db)):
+    """Intercambia un Firebase ID token por un JWT del sistema."""
+    settings = get_settings()
+
+    # Verifica el ID token contra la API pública de Firebase
+    verify_url = (
+        f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/"
+        f"getAccountInfo?key={settings.firebase_api_key}"
+    )
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(verify_url, json={"idToken": body.id_token})
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Firebase token")
+
+    data = resp.json()
+    users = data.get("users", [])
+    if not users or not users[0].get("email"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No email in token")
+
+    email: str = users[0]["email"]
+
+    # Dominio permitido
+    allowed = settings.firebase_allowed_domains.split(",")
+    domain = email.split("@")[-1]
+    if domain not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Domain @{domain} not authorized",
+        )
+
+    # Buscar o crear el usuario admin
+    result = await db.execute(select(AdminUser).where(AdminUser.username == email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        user = AdminUser(username=email, display_name=users[0].get("displayName") or email)
+        user.set_password(body.id_token[-16:])
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        logger.info("Nuevo usuario admin creado via Google OAuth: %s", email)
+
+    sub = f"user:{email}"
     return TokenResponse(
         access_token=create_access_token(sub),
         refresh_token=create_refresh_token(sub),
