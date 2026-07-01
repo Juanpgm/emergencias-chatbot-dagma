@@ -70,13 +70,13 @@ OTRAS REGLAS:
 EJEMPLO:
 Texto: "oiga hay un palo enorme caido en la 8 con 15 en el granada ta bloqueando los carros \
 soy Carlos Perez cel 3001234567"
-JSON: {"nombre_reportante":"Carlos Pérez","telefono":"3001234567","email":null,\
+JSON: {{"nombre_reportante":"Carlos Pérez","telefono":"3001234567","email":null,\
 "direccion_hechos":"Carrera 8 con Calle 15","direccion_persona":null,\
 "tipo_de_emergencia":"arbol_caido",\
 "descripcion_emergencia":"Árbol caído bloquea la Carrera 8 con Calle 15 en Granada.",\
 "descripcion_detallada":"Un árbol de gran tamaño obstruye el tráfico vehicular en el barrio Granada. La vía está completamente bloqueada.",\
 "ubicacion_inferida":"Barrio Granada","latitud":null,"longitud":null,\
-"nivel_de_gravedad":"alta","requiere_atencion_inmediata":true}
+"nivel_de_gravedad":"alta","requiere_atencion_inmediata":true}}
 """
 
 _prompt = ChatPromptTemplate.from_messages([
