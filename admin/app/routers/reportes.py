@@ -5,7 +5,9 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import Select
 
 from admin.app.core.auth import get_current_user, get_current_username
 from shared.core.database import get_db
@@ -41,6 +43,25 @@ async def _get_seg_counts(db: AsyncSession, reporte_ids: list[int]) -> dict[int,
         .group_by(ReporteSeguimiento.reporte_id)
     )
     return {row.reporte_id: row.cnt for row in result}
+
+
+async def _ejecutar_listado(db: AsyncSession, query: Select, limit: int) -> PaginacionCursor:
+    """Ejecuta un query de listado, calcula seguimiento_count y arma la paginacion por cursor.
+
+    Centraliza el manejo de errores de base de datos: cualquier fallo se loguea con traza
+    completa y se traduce a un 503 con mensaje generico, en vez de un 500 opaco.
+    """
+    try:
+        result = await db.execute(query)
+        rows = result.scalars().all()
+        seg_counts = await _get_seg_counts(db, [r.id for r in rows])
+    except SQLAlchemyError:
+        logger.exception("Error de base de datos al listar reportes")
+        raise HTTPException(status_code=503, detail="Error al consultar la base de datos") from None
+
+    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
+    next_cursor = rows[-1].id if len(rows) == limit else None
+    return PaginacionCursor(items=items, next_cursor=next_cursor)
 
 
 def _reporte_a_gestion(r: ReporteEmergencia, seg_count: int = 0) -> ReporteGestionResponse:
@@ -111,12 +132,7 @@ async def listar_reportes(
             query = query.where(ReporteEmergencia.asignado_a.is_(None))
         else:
             query = query.where(ReporteEmergencia.asignado_a == asignado_a)
-    result = await db.execute(query)
-    rows = result.scalars().all()
-    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
-    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
-    next_cursor = rows[-1].id if len(rows) == limit else None
-    return PaginacionCursor(items=items, next_cursor=next_cursor)
+    return await _ejecutar_listado(db, query, limit)
 
 
 @router.get("/mis-tareas", response_model=PaginacionCursor)
@@ -134,12 +150,7 @@ async def mis_tareas(
     )
     if cursor is not None:
         query = query.where(ReporteEmergencia.id < cursor)
-    result = await db.execute(query)
-    rows = result.scalars().all()
-    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
-    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
-    next_cursor = rows[-1].id if len(rows) == limit else None
-    return PaginacionCursor(items=items, next_cursor=next_cursor)
+    return await _ejecutar_listado(db, query, limit)
 
 
 @router.post("/", response_model=ReporteGestionResponse, status_code=201)
@@ -188,8 +199,14 @@ async def crear_reporte(
 
 @router.get("/{reporte_id}", response_model=ReporteDetailResponse)
 async def detalle_reporte(reporte_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(ReporteEmergencia).where(ReporteEmergencia.id == reporte_id))
-    reporte = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(ReporteEmergencia).where(ReporteEmergencia.id == reporte_id)
+        )
+        reporte = result.scalar_one_or_none()
+    except SQLAlchemyError:
+        logger.exception("Error de base de datos al obtener el detalle del reporte %s", reporte_id)
+        raise HTTPException(status_code=503, detail="Error al consultar la base de datos") from None
     if not reporte:
         raise HTTPException(status_code=404, detail="Reporte no encontrado")
     return _reporte_a_detail(reporte)
@@ -213,12 +230,7 @@ async def listar_arbol_caido(
     )
     if cursor is not None:
         query = query.where(ReporteEmergencia.id < cursor)
-    result = await db.execute(query)
-    rows = result.scalars().all()
-    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
-    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
-    next_cursor = rows[-1].id if len(rows) == limit else None
-    return PaginacionCursor(items=items, next_cursor=next_cursor)
+    return await _ejecutar_listado(db, query, limit)
 
 
 @router.get(
@@ -239,12 +251,7 @@ async def listar_rescate_animales(
     )
     if cursor is not None:
         query = query.where(ReporteEmergencia.id < cursor)
-    result = await db.execute(query)
-    rows = result.scalars().all()
-    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
-    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
-    next_cursor = rows[-1].id if len(rows) == limit else None
-    return PaginacionCursor(items=items, next_cursor=next_cursor)
+    return await _ejecutar_listado(db, query, limit)
 
 
 @router.get(
@@ -265,12 +272,7 @@ async def listar_tala_arboles(
     )
     if cursor is not None:
         query = query.where(ReporteEmergencia.id < cursor)
-    result = await db.execute(query)
-    rows = result.scalars().all()
-    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
-    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
-    next_cursor = rows[-1].id if len(rows) == limit else None
-    return PaginacionCursor(items=items, next_cursor=next_cursor)
+    return await _ejecutar_listado(db, query, limit)
 
 
 @router.get(
@@ -294,9 +296,4 @@ async def listar_contaminacion_hidrica(
     )
     if cursor is not None:
         query = query.where(ReporteEmergencia.id < cursor)
-    result = await db.execute(query)
-    rows = result.scalars().all()
-    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
-    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
-    next_cursor = rows[-1].id if len(rows) == limit else None
-    return PaginacionCursor(items=items, next_cursor=next_cursor)
+    return await _ejecutar_listado(db, query, limit)

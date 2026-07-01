@@ -36,9 +36,15 @@ async def lifespan(application: FastAPI):
     logger.info("Ejecutando migraciones de base de datos...")
     try:
         await asyncio.to_thread(_run_migrations)
+        application.state.migrations_ok = True
         logger.info("Migraciones completadas.")
     except Exception:
-        logger.exception("Error al ejecutar migraciones — la app continua de todas formas.")
+        application.state.migrations_ok = False
+        logger.critical(
+            "Error al ejecutar migraciones — el esquema puede estar incompleto y las "
+            "lecturas pueden fallar. La app continua para permitir diagnostico via /health.",
+            exc_info=True,
+        )
     yield
 
 
@@ -57,4 +63,8 @@ app.include_router(gestion.router)
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "admin"}
+    # Devuelve 200 siempre (para no tumbar el healthcheck del proveedor) pero expone
+    # el estado degradado cuando las migraciones fallaron al arrancar.
+    if getattr(app.state, "migrations_ok", True):
+        return {"status": "healthy", "service": "admin"}
+    return {"status": "degraded", "service": "admin", "db": "migrations_failed"}
