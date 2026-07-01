@@ -31,6 +31,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/reportes", tags=["Reportes"], dependencies=[Depends(get_current_user)])
 
 
+async def _get_seg_counts(db: AsyncSession, reporte_ids: list[int]) -> dict[int, int]:
+    """Devuelve un mapa {reporte_id: count} de seguimientos para los IDs dados."""
+    if not reporte_ids:
+        return {}
+    result = await db.execute(
+        select(ReporteSeguimiento.reporte_id, func.count(ReporteSeguimiento.id).label("cnt"))
+        .where(ReporteSeguimiento.reporte_id.in_(reporte_ids))
+        .group_by(ReporteSeguimiento.reporte_id)
+    )
+    return {row.reporte_id: row.cnt for row in result}
+
+
 def _reporte_a_gestion(r: ReporteEmergencia, seg_count: int = 0) -> ReporteGestionResponse:
     return ReporteGestionResponse(
         id=r.id,
@@ -101,7 +113,8 @@ async def listar_reportes(
             query = query.where(ReporteEmergencia.asignado_a == asignado_a)
     result = await db.execute(query)
     rows = result.scalars().all()
-    items = [_reporte_a_gestion(r) for r in rows]
+    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
+    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
     next_cursor = rows[-1].id if len(rows) == limit else None
     return PaginacionCursor(items=items, next_cursor=next_cursor)
 
@@ -123,7 +136,8 @@ async def mis_tareas(
         query = query.where(ReporteEmergencia.id < cursor)
     result = await db.execute(query)
     rows = result.scalars().all()
-    items = [_reporte_a_gestion(r) for r in rows]
+    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
+    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
     next_cursor = rows[-1].id if len(rows) == limit else None
     return PaginacionCursor(items=items, next_cursor=next_cursor)
 
@@ -201,7 +215,8 @@ async def listar_arbol_caido(
         query = query.where(ReporteEmergencia.id < cursor)
     result = await db.execute(query)
     rows = result.scalars().all()
-    items = [_reporte_a_gestion(r) for r in rows]
+    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
+    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
     next_cursor = rows[-1].id if len(rows) == limit else None
     return PaginacionCursor(items=items, next_cursor=next_cursor)
 
@@ -226,7 +241,8 @@ async def listar_rescate_animales(
         query = query.where(ReporteEmergencia.id < cursor)
     result = await db.execute(query)
     rows = result.scalars().all()
-    items = [_reporte_a_gestion(r) for r in rows]
+    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
+    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
     next_cursor = rows[-1].id if len(rows) == limit else None
     return PaginacionCursor(items=items, next_cursor=next_cursor)
 
@@ -251,7 +267,8 @@ async def listar_tala_arboles(
         query = query.where(ReporteEmergencia.id < cursor)
     result = await db.execute(query)
     rows = result.scalars().all()
-    items = [_reporte_a_gestion(r) for r in rows]
+    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
+    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
     next_cursor = rows[-1].id if len(rows) == limit else None
     return PaginacionCursor(items=items, next_cursor=next_cursor)
 
@@ -279,6 +296,7 @@ async def listar_contaminacion_hidrica(
         query = query.where(ReporteEmergencia.id < cursor)
     result = await db.execute(query)
     rows = result.scalars().all()
-    items = [_reporte_a_gestion(r) for r in rows]
+    seg_counts = await _get_seg_counts(db, [r.id for r in rows])
+    items = [_reporte_a_gestion(r, seg_counts.get(r.id, 0)) for r in rows]
     next_cursor = rows[-1].id if len(rows) == limit else None
     return PaginacionCursor(items=items, next_cursor=next_cursor)
