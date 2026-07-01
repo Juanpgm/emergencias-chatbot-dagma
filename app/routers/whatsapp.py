@@ -112,7 +112,7 @@ _FRASES_ORIENTACION = {
 def _es_mensaje_vago(texto: str) -> bool:
     """Retorna True si el texto es demasiado corto o vago para extraer datos."""
     t = texto.lower().strip()
-    return len(t) < 25 or t in _FRASES_VAGAS
+    return len(t) < 12 or t in _FRASES_VAGAS
 
 
 def _es_consulta_orientacion(texto: str) -> bool:
@@ -160,7 +160,7 @@ def _tiene_ubicacion(datos: DatosEmergencia) -> bool:
 
     for campo in (datos.direccion_hechos, datos.ubicacion_inferida):
         valor = (campo or "").strip().lower()
-        if valor and valor not in _PALABRAS_VAGAS and len(valor) >= 12:
+        if valor and valor not in _PALABRAS_VAGAS and len(valor) >= 5:
             return True
     return False
 
@@ -331,7 +331,10 @@ async def recibir_mensaje_whatsapp(
                 datos.ubicacion_inferida = f"GPS: {Latitude}, {Longitude}"
             elif texto_nuevo:
                 try:
-                    datos_ubicacion = await extraer_ubicacion(texto_nuevo)
+                    datos_ubicacion = await extraer_ubicacion(
+                        texto_nuevo,
+                        contexto_reporte=pendiente.texto_original,
+                    )
                     if datos_ubicacion.direccion_hechos:
                         datos.direccion_hechos = datos_ubicacion.direccion_hechos
                     if datos_ubicacion.ubicacion_inferida:

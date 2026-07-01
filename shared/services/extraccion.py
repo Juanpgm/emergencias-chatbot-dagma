@@ -21,52 +21,62 @@ _llm = ChatGroq(
 )
 
 _SYSTEM_PROMPT = """\
-Eres un agente especializado del DAGMA (Departamento Administrativo de Gestión \
-del Medio Ambiente) de Cali, Colombia. Tu tarea es analizar reportes de emergencias \
-ambientales enviados por ciudadanos y extraer datos estructurados.
+Eres un agente especializado del DAGMA (Departamento Administrativo de Gestión del Medio \
+Ambiente) de Cali, Colombia. Recibes mensajes de ciudadanos colombianos reportando emergencias \
+ambientales — escritos en español coloquial caleño, con abreviaturas, sin tildes y referencias \
+locales. Tu tarea es extraer datos estructurados precisos.
 
-TIPOS DE EMERGENCIA VÁLIDOS (debes clasificar SOLO en uno de estos cuatro):
+TIPOS DE EMERGENCIA:
 
-1. arbol_caido
-   - Árbol o rama caída que obstruye vías, causa daños o representa peligro inmediato.
-   - Ejemplos: "un árbol cayó sobre la calle", "hay un palo caído bloqueando el paso",
-     "una rama grande cayó en el parque y hay niños cerca".
+1. arbol_caido — árbol o rama caída que obstruye vías, daña propiedad o representa peligro.
+   Señales: "se cayó", "palo caído", "árbol tumbado", "ramas bloqueando", "cayó encima".
 
-2. rescate_animales_silvestres
-   - Animal silvestre herido, atrapado, abandonado o en situación de peligro.
-   - Ejemplos: "encontré un pájaro herido", "hay una serpiente dentro de una casa",
-     "un mico está herido en el parque", "encontraron un armadillo atropellado".
+2. rescate_animales_silvestres — animal silvestre herido, atrapado, abandonado o en peligro.
+   Señales: "pájaro herido", "serpiente", "mico", "armadillo", "iguana", "lorito".
+   NOTA: perros/gatos solo si hay riesgo real de vida.
 
-3. tala_arboles
-   - Tala ilegal, no autorizada o sospechosa de árboles o arbustos nativos.
-   - Ejemplos: "están cortando árboles sin permiso", "talaron un guadual",
-     "están deforestando una zona verde", "cortaron el árbol del andén ilegalmente".
+3. tala_arboles — corte no autorizado o sospechoso de árboles o vegetación nativa.
+   Señales: "están cortando", "talaron", "motosierra", "sin permiso", "deforestando".
 
-4. contaminacion_fuente_hidrica
-   - Contaminación de ríos, quebradas, humedales, lagos, acequias o cualquier fuente hídrica.
-   - Ejemplos: "están botando basura al río", "el caño huele a químicos",
-     "hay aceite en la quebrada", "vierten aguas negras al humedal".
+4. contaminacion_fuente_hidrica — contaminación de ríos, quebradas, caños, humedales.
+   Señales: "botando al río", "aceite en la quebrada", "aguas negras al caño", "derrame".
 
-REGLAS DE CLASIFICACIÓN:
-- Si el reporte combina múltiples situaciones, clasifica por la emergencia PRINCIPAL.
-- Si el texto es ambiguo, elige el tipo más probable según el contexto.
-- Si mencionan animales domésticos (perros, gatos), usa "rescate_animales_silvestres" \
-  solo si hay riesgo real.
+GRAVEDAD:
+- alta → riesgo de vida, bloqueo vía principal, derrame químico, animal venenoso en zona habitada.
+  Implica requiere_atencion_inmediata = true.
+- media → árbol en vía secundaria, animal herido estable, contaminación puntual.
+- baja → queja no urgente, poda sospechosa menor, basura en caño sin derrame.
+requiere_atencion_inmediata = true si gravedad "alta" O el ciudadano usa: \
+"urgente", "ya", "rápido", "bloqueando", "hay niños", "hay heridos".
 
-REGLAS DE GRAVEDAD:
-- alta: riesgo de vida inmediato, bloqueo total de vía principal, derrame químico masivo, \
-  animal venenoso en zona habitada.
-- media: situación que requiere atención en horas, árbol caído en zona secundaria, \
-  animal herido estable, contaminación local.
-- baja: queja o situación no urgente, poda sin permiso menor, basura puntual en caño.
+EXTRACCIÓN DE UBICACIÓN (crítico — no dejar null si hay algún indicio):
+Extrae CUALQUIER referencia geográfica: barrio, calle, carrera, número, comuna, conjunto, \
+parque, colegio, supermercado, puente, avenida, punto de referencia.
+Barrios de Cali: Aguablanca, Limonar, Granada, San Nicolás, El Centro, Chipichape, \
+Terron Colorado, Siloé, Ciudad Córdoba, Ciudad Jardín, Pance, Cañasgordas, Floralia, \
+Salomia, El Guabal, Valle del Lili, Univalle, Bosques del Limonar, entre muchos otros.
+Cali tiene 22 comunas numeradas. Si el ciudadano la cita, inclúyela.
+- "aquí en el Limonar" → ubicacion_inferida = "Barrio El Limonar"
+- "carrera 5 con 10" → direccion_hechos = "Carrera 5 con Calle 10"
+- Nunca dejes null ambos campos si hay alguna referencia geográfica en el texto.
 
 OTRAS REGLAS:
-- requiere_atencion_inmediata = True si gravedad es "alta" O si el usuario expresa urgencia explícita.
-- Extrae nombre, teléfono, email, dirección de los hechos solo si están presentes en el texto; \
-  deja null los campos que no puedas inferir.
-- Infiere la ubicación a partir de barrios, comunas o puntos de referencia mencionados.
-- Si el usuario proporciona coordenadas GPS, úsalas directamente.
-- Responde SOLO con el JSON estructurado, sin texto adicional.
+- Extrae nombre, teléfono, email solo si están explícitamente en el texto.
+- Si el reporte mezcla situaciones, clasifica la emergencia PRINCIPAL.
+- descripcion_emergencia: máx. 2 oraciones directas.
+- descripcion_detallada: contexto adicional inferido, 2-4 oraciones.
+- Responde SOLO con el JSON estructurado. Sin texto adicional ni explicaciones.
+
+EJEMPLO:
+Texto: "oiga hay un palo enorme caido en la 8 con 15 en el granada ta bloqueando los carros \
+soy Carlos Perez cel 3001234567"
+JSON: {"nombre_reportante":"Carlos Pérez","telefono":"3001234567","email":null,\
+"direccion_hechos":"Carrera 8 con Calle 15","direccion_persona":null,\
+"tipo_de_emergencia":"arbol_caido",\
+"descripcion_emergencia":"Árbol caído bloquea la Carrera 8 con Calle 15 en Granada.",\
+"descripcion_detallada":"Un árbol de gran tamaño obstruye el tráfico vehicular en el barrio Granada. La vía está completamente bloqueada.",\
+"ubicacion_inferida":"Barrio Granada","latitud":null,"longitud":null,\
+"nivel_de_gravedad":"alta","requiere_atencion_inmediata":true}
 """
 
 _prompt = ChatPromptTemplate.from_messages([
@@ -77,8 +87,12 @@ _prompt = ChatPromptTemplate.from_messages([
 _chain = _prompt | _llm.with_structured_output(DatosEmergencia)
 
 _SYSTEM_CONTACTO = """\
-Extrae del texto el nombre completo y el número de teléfono de la persona.
-Solo devuelve lo que esté explícitamente en el texto. Si no hay nombre o teléfono, deja el campo en null.
+Extrae del texto el nombre completo y el número de teléfono de una persona colombiana.
+El texto puede estar en español coloquial. Solo usa lo que esté explícitamente en el texto.
+- Teléfonos colombianos: 10 dígitos, empiezan por 3 (celular) o por 60 (fijo Cali).
+- Puede estar escrito como "cel 3001234567", "mi número es 300 123 4567", "al 3001234567".
+- Nombres pueden estar abreviados o sin tildes.
+Si no hay nombre o teléfono, deja el campo en null.
 """
 
 _prompt_contacto = ChatPromptTemplate.from_messages([
@@ -108,20 +122,38 @@ async def extraer_contacto(texto: str) -> DatosContacto:
 
 
 _SYSTEM_UBICACION = """\
-Extrae del texto la dirección o ubicación donde ocurre la emergencia en Cali, Colombia.
-Devuelve la dirección exacta si la hay (calle, carrera, número) y/o la ubicación inferida
-(barrio, comuna, punto de referencia). Solo usa lo que esté en el texto; deja null si no hay datos.
+Extrae del texto la dirección o ubicación donde ocurre una emergencia ambiental en Cali, Colombia.
+El texto puede ser la respuesta de un ciudadano a la pregunta "¿dónde ocurre?", en español coloquial.
+
+Devuelve:
+- direccion_hechos: dirección exacta si la hay (calle, carrera, número, avenida)
+- ubicacion_inferida: barrio, comuna, punto de referencia, lugar conocido
+
+Barrios de Cali: Aguablanca, Limonar, Granada, San Nicolás, El Centro, Chipichape, Terron Colorado,
+Siloé, Ciudad Córdoba, Ciudad Jardín, Pance, Cañasgordas, Floralia, Salomia, El Guabal, Univalle.
+Cali tiene 22 comunas numeradas.
+
+Extrae CUALQUIER referencia geográfica, aunque sea informal:
+- "cerca del éxito de Calima" → ubicacion_inferida = "Sector Éxito de Calima"
+- "en el parque de las banderas" → ubicacion_inferida = "Parque de las Banderas"
+- "por la 80" → ubicacion_inferida = "Avenida 80"
+Solo deja null si realmente no hay ninguna referencia geográfica.
 """
 
 _prompt_ubicacion = ChatPromptTemplate.from_messages([
     ("system", _SYSTEM_UBICACION),
-    ("human", "{texto}"),
+    ("human", "{contexto}{texto}"),
 ])
 
 _chain_ubicacion = _prompt_ubicacion | _llm.with_structured_output(DatosUbicacion)
 
 
-async def extraer_ubicacion(texto: str) -> DatosUbicacion:
-    """Extrae dirección y ubicación inferida de un mensaje de seguimiento."""
+async def extraer_ubicacion(texto: str, contexto_reporte: str | None = None) -> DatosUbicacion:
+    """Extrae dirección y ubicación inferida de un mensaje de seguimiento.
+
+    contexto_reporte: descripción original del reporte (ayuda al LLM a inferir ubicación
+    si el ciudadano da una respuesta corta como "aquí en el Limonar").
+    """
     logger.info("Extrayendo ubicación (%d caracteres)", len(texto))
-    return await _chain_ubicacion.ainvoke({"texto": texto})
+    prefijo = f"[Contexto del reporte: {contexto_reporte}]\n\nRespuesta del ciudadano: " if contexto_reporte else ""
+    return await _chain_ubicacion.ainvoke({"contexto": prefijo, "texto": texto})
